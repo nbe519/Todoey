@@ -10,7 +10,7 @@ import UIKit
 
 class ToDoListViewController: UITableViewController {
 
-    let itemArray = ["Find Mike", "Buy Eggos", "Destroy Demogorgon"]
+    var itemArray = ["Find Mike", "Buy Eggos", "Destroy Demogorgon"]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -22,7 +22,7 @@ class ToDoListViewController: UITableViewController {
     //Make the number of rows in the table equal to that which are in the item array
     override func tableView(_ tableView : UITableView,  numberOfRowsInSection section: Int) -> Int {
         
-        //creates 3 cells(the number of items in the array)
+        //creates cells based on the number of items in the itemArray
         return itemArray.count
         
     }
@@ -30,10 +30,12 @@ class ToDoListViewController: UITableViewController {
     //function that gets triggered when the table view looks to find something to display in it
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        //what should be the cell that we display at a row. This is for all number of cells
+        //gets the cell(s) with identifier ToDoItemCell from the storyboard and allows it to be used
+        //We are creating a reusable cell for memory conservation
+        //the indexPath is the location of the cell we are initializing
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
         
-        //have the cell have the text of the item at x-location, gives the cell text
+        //have the cell have the text of the item at a certain location and provide the cell text
         //indexPath holds location of the cell
         cell.textLabel?.text = itemArray[indexPath.row]
         
@@ -46,8 +48,6 @@ class ToDoListViewController: UITableViewController {
     //disSelectRowAt detects which row was selected. In  the method, we use that information to change the accessory
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        //if you do not place itemArray before the indexPath.row, then it will just print the cell number
-        //print(itemArray[indexPath.row])
         
         
         //if the cell already has a checkmark, then change the accessory back to nothing
@@ -69,6 +69,37 @@ class ToDoListViewController: UITableViewController {
         
     }
     
+    @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
+        //Create an alert with an action and a textField, and once the user taps the action, it adds whatecher they typed into the textField and appends it to array which adds it to the tableView
+        var textField = UITextField()
+        
+    
+        let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
+        
+        
+        //the title of the action is what is clicked when the user is done
+        //the action keyword in the closure is the action that will be completed when the user taps the button
+        let action = UIAlertAction(title: "Add Button", style: .default) { (action) in
+            
+            //what will happen once the user clicks the Add Item button on our UIAlert
+            //force unwrap because the textField can never be nil
+            self.itemArray.append(textField.text!)
+            
+            //refresh the tableView
+            self.tableView.reloadData()
+            
+        }
+        //the parameter, alertTextField, helps configure the textField
+        alert.addTextField { (alertTextField) in
+            alertTextField.placeholder = "Create new item"
+            textField = alertTextField
+        
+        }
+        
+        alert.addAction(action)
+        
+        present(alert, animated: true, completion: nil)
+    }
     
     
 }
