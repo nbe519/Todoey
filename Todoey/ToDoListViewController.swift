@@ -12,9 +12,16 @@ class ToDoListViewController: UITableViewController {
 
     var itemArray = ["Find Mike", "Buy Eggos", "Destroy Demogorgon"]
     
+    let defaults = UserDefaults.standard
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view, typically from a nib.
+    
+        //Returns the array for the specific key
+        if let item = defaults.array(forKey: "TodoListArray") as? [String] {
+            //set the itemArray to the item array with the key TodoListArray
+            itemArray = item
+        }
     }
 
     //MARK: - Tableview Datasource Methods
@@ -27,10 +34,10 @@ class ToDoListViewController: UITableViewController {
         
     }
     
-    //function that gets triggered when the table view looks to find something to display in it
+    //Gets called everytime we want a new cell to appear
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        //gets the cell(s) with identifier ToDoItemCell from the storyboard and allows it to be used
+        //gets the cell(s) with identifier ToDoItemCell from the storyboard and allows it to be re-used when it leaves the screen
         //We are creating a reusable cell for memory conservation
         //the indexPath is the location of the cell we are initializing
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
@@ -84,6 +91,9 @@ class ToDoListViewController: UITableViewController {
             //what will happen once the user clicks the Add Item button on our UIAlert
             //force unwrap because the textField can never be nil
             self.itemArray.append(textField.text!)
+            
+            //forKey is the key where the items are going to be retrived from
+            self.defaults.set(self.itemArray, forKey: "TodoListArray")
             
             //refresh the tableView
             self.tableView.reloadData()
