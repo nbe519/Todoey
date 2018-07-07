@@ -10,17 +10,33 @@ import UIKit
 
 class ToDoListViewController: UITableViewController {
 
-    var itemArray = ["Find Mike", "Buy Eggos", "Destroy Demogorgon"]
+    var itemArray = [Item]()
+    
     
     let defaults = UserDefaults.standard
     
     override func viewDidLoad() {
         super.viewDidLoad()
-    
+        
+        let newItem = Item()
+        newItem.title = "Find Mike"
+        itemArray.append(newItem)
+        
+        let newItem1 = Item()
+        newItem1.title = "Buy eggos"
+        itemArray.append(newItem1)
+        
+        let newItem2 = Item()
+        newItem2.title = "Destroy Demogorgon"
+        itemArray.append(newItem2)
+        
+        print(itemArray)
+        
         //Returns the array for the specific key
-        if let item = defaults.array(forKey: "TodoListArray") as? [String] {
-            //set the itemArray to the item array with the key TodoListArray
-            itemArray = item
+        //as! [Items]  means that the retrieved information will be used as an array ([ ]) of Item values.
+        //Whent the project loads, it should load up each cell taht the user added
+        if let items = defaults.array(forKey: "TodoListArray") as? [Item] {
+            itemArray = items
         }
     }
 
@@ -37,14 +53,26 @@ class ToDoListViewController: UITableViewController {
     //Gets called everytime we want a new cell to appear
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
+        //The following line does not work, because once the cell leaves the screen, it destroys the cell and creates a new one when scrolled back to the top; forgetting the accessory
+        //let cell = UITableViewCell(style: .default, reuseIdentifier: "ToDoItemCell")
+        
         //gets the cell(s) with identifier ToDoItemCell from the storyboard and allows it to be re-used when it leaves the screen
         //We are creating a reusable cell for memory conservation
-        //the indexPath is the location of the cell we are initializing
+        //Go and find the prototype cell, ToDoItemCell, generate a bunch that can be reused. Once the item is no longer visible, it will reused by going to bottom of table.
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
+
+        let item = itemArray[indexPath.row]
         
         //have the cell have the text of the item at a certain location and provide the cell text
         //indexPath holds location of the cell
-        cell.textLabel?.text = itemArray[indexPath.row]
+        cell.textLabel?.text = item.title
+         
+        //Ternary operator
+        //value = condition ? valueIfTrue : valueIfFalse
+        //Set the cell accessoryType based on if the item.done is true, if it is, place a checkmark, else put nothing
+        cell.accessoryType = item.done ? .checkmark : .none
+        
+        
         
         return cell
     }
@@ -55,18 +83,9 @@ class ToDoListViewController: UITableViewController {
     //disSelectRowAt detects which row was selected. In  the method, we use that information to change the accessory
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        
-        
-        //if the cell already has a checkmark, then change the accessory back to nothing
-        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
-            //the cell at this indexPath in our table view will have an accessory type of no accessory
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        }
-        //else, display a checkmark
-        else {
-            //the cell at this indexPath in our table view will have an accessory type of a checkmark
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-        }
+        //sets the done property to the opposite of the currentItem
+        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
+        tableView.reloadData()
         
         //after cell is clicked, deselect it
         tableView.deselectRow(at: indexPath, animated: true)
@@ -88,9 +107,12 @@ class ToDoListViewController: UITableViewController {
         //the action keyword in the closure is the action that will be completed when the user taps the button
         let action = UIAlertAction(title: "Add Button", style: .default) { (action) in
             
+            let newItem = Item()
+            newItem.title = textField.text!
+            
             //what will happen once the user clicks the Add Item button on our UIAlert
             //force unwrap because the textField can never be nil
-            self.itemArray.append(textField.text!)
+            self.itemArray.append(newItem)
             
             //forKey is the key where the items are going to be retrived from
             self.defaults.set(self.itemArray, forKey: "TodoListArray")
