@@ -9,35 +9,22 @@
 import UIKit
 
 class ToDoListViewController: UITableViewController {
-
+    //following lines: converts arrayOfItems into a plist file we can save and retrive from
     var itemArray = [Item]()
+    //Get the directory the data is being stored, return the location, and create a new plist in it
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
     
     
-    let defaults = UserDefaults.standard
     
     override func viewDidLoad() {
         super.viewDidLoad()
+
         
-        let newItem = Item()
-        newItem.title = "Find Mike"
-        itemArray.append(newItem)
+        print(dataFilePath)
         
-        let newItem1 = Item()
-        newItem1.title = "Buy eggos"
-        itemArray.append(newItem1)
         
-        let newItem2 = Item()
-        newItem2.title = "Destroy Demogorgon"
-        itemArray.append(newItem2)
-        
-        print(itemArray)
-        
-        //Returns the array for the specific key
-        //as! [Items]  means that the retrieved information will be used as an array ([ ]) of Item values.
-        //Whent the project loads, it should load up each cell taht the user added
-        if let items = defaults.array(forKey: "TodoListArray") as? [Item] {
-            itemArray = items
-        }
+        //load up Item.plist
+        loadItems()
     }
 
     //MARK: - Tableview Datasource Methods
@@ -53,7 +40,7 @@ class ToDoListViewController: UITableViewController {
     //Gets called everytime we want a new cell to appear
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        //The following line does not work, because once the cell leaves the screen, it destroys the cell and creates a new one when scrolled back to the top; forgetting the accessory
+        //The following line does not work, because once the cell leaves the screen, it destroys the cell and creates a new one. When user scrolled back to the top it is forgetting if it needs an accessory
         //let cell = UITableViewCell(style: .default, reuseIdentifier: "ToDoItemCell")
         
         //gets the cell(s) with identifier ToDoItemCell from the storyboard and allows it to be re-used when it leaves the screen
@@ -72,8 +59,6 @@ class ToDoListViewController: UITableViewController {
         //Set the cell accessoryType based on if the item.done is true, if it is, place a checkmark, else put nothing
         cell.accessoryType = item.done ? .checkmark : .none
         
-        
-        
         return cell
     }
     
@@ -83,9 +68,11 @@ class ToDoListViewController: UITableViewController {
     //disSelectRowAt detects which row was selected. In  the method, we use that information to change the accessory
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        //sets the done property to the opposite of the currentItem
+        //sets the done property to the opposite of what it currently is
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
-        tableView.reloadData()
+        
+        saveItems()
+
         
         //after cell is clicked, deselect it
         tableView.deselectRow(at: indexPath, animated: true)
@@ -114,11 +101,7 @@ class ToDoListViewController: UITableViewController {
             //force unwrap because the textField can never be nil
             self.itemArray.append(newItem)
             
-            //forKey is the key where the items are going to be retrived from
-            self.defaults.set(self.itemArray, forKey: "TodoListArray")
-            
-            //refresh the tableView
-            self.tableView.reloadData()
+            self.saveItems()
             
         }
         //the parameter, alertTextField, helps configure the textField
@@ -131,6 +114,36 @@ class ToDoListViewController: UITableViewController {
         alert.addAction(action)
         
         present(alert, animated: true, completion: nil)
+    }
+    //method which pushes the items into the Item.plist
+    func saveItems() {
+        let encoder = PropertyListEncoder()
+        
+        do {
+            //encode the itemArray
+            let data = try encoder.encode(self.itemArray)
+            //write the data to the dataFilePath
+            try data.write(to: self.dataFilePath!)
+        } catch {
+            print("Error encoding item array \(error)")
+        }
+        
+        //refresh the tableView
+        self.tableView.reloadData()
+    }
+    //method which decodes the items in the Item.plist to display them back on the VC
+    func loadItems() {
+        //tap into our data by grabbing the property list
+        if let data = try? Data(contentsOf: dataFilePath!) {
+            //create the decoder
+            let decoder = PropertyListDecoder()
+            do {
+                //decode the data from the dataFilePath, the data-type is of type Item
+                itemArray = try decoder.decode([Item].self, from: data)
+            } catch {
+                print("Error deconding item array \(error)")
+            }
+        }
     }
     
     
