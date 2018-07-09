@@ -7,23 +7,27 @@
 //
 
 import UIKit
+import CoreData
 
 class ToDoListViewController: UITableViewController {
     //following lines: converts arrayOfItems into a plist file we can save and retrive from
     var itemArray = [Item]()
-    //Get the directory the data is being stored, return the location, and create a new plist in it
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
     
+    //(C.R.U.D)
+    //tapping into the UIapplicationClass, we are getting the shared singleton element(this corresponds to the current app as an object) tapping into its delegate with the data-type of an optional UIApplicationDelegate, casting it to our class Appdelegate. Now have access to appDelegate as an object.
+    //Context is a temporary area, where you create things in the database, you do not do this directly in the persistentContainer. Only once you decided you are happy with your results, do you save the context
+    //context is a constant that goes into appDelegate then we grab a reference to the viewContext.
+    //viewContext is the temporary area that our app talks to
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         
-        print(dataFilePath)
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         
-        
-        //load up Item.plist
+        //load up the data
         loadItems()
     }
 
@@ -47,7 +51,8 @@ class ToDoListViewController: UITableViewController {
         //We are creating a reusable cell for memory conservation
         //Go and find the prototype cell, ToDoItemCell, generate a bunch that can be reused. Once the item is no longer visible, it will reused by going to bottom of table.
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
-
+        
+        //indexPath.row is going to hold the value of the row the resuableCell is at. If the Cell is at indexPath 1, then the itemArray is going to hold the 1-element inside
         let item = itemArray[indexPath.row]
         
         //have the cell have the text of the item at a certain location and provide the cell text
@@ -70,6 +75,13 @@ class ToDoListViewController: UITableViewController {
         
         //sets the done property to the opposite of what it currently is
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
+        
+
+//        //removes from the context, this has to be called before we remove it from the itemArray
+//        context.delete(itemArray[indexPath.row])
+//        //removes the data from the itemArray, which loads up tableViewDataSource
+//        itemArray.remove(at: indexPath.row)
+//
         
         saveItems()
 
@@ -94,13 +106,19 @@ class ToDoListViewController: UITableViewController {
         //the action keyword in the closure is the action that will be completed when the user taps the button
         let action = UIAlertAction(title: "Add Button", style: .default) { (action) in
             
-            let newItem = Item()
+            
+            //When we add a new item to our tableview, we create a new object of type Item(automatically generated when we create a new entity), class already has access to all the properties. Type NSManagedObject, the rows that are inside the table, every row is its own NSManagedObject. Then we fill each of its fields then save it.
+            //not only initializes new item but also inserts it to the context
+            let newItem = Item(context: self.context)
             newItem.title = textField.text!
+            //declare all new items with the done equal to false, no checkmark
+            newItem.done = false
             
             //what will happen once the user clicks the Add Item button on our UIAlert
             //force unwrap because the textField can never be nil
             self.itemArray.append(newItem)
             
+            //save the items whenever a newItem is appended to the itemArray
             self.saveItems()
             
         }
@@ -115,37 +133,80 @@ class ToDoListViewController: UITableViewController {
         
         present(alert, animated: true, completion: nil)
     }
-    //method which pushes the items into the Item.plist
+    //transfer what is in the staging area to our permament data-source
+    //This is called when we create a new Item and when we change the .done attribute
     func saveItems() {
-        let encoder = PropertyListEncoder()
-        
         do {
-            //encode the itemArray
-            let data = try encoder.encode(self.itemArray)
-            //write the data to the dataFilePath
-            try data.write(to: self.dataFilePath!)
+            //try to save the data
+            //looks at context, temporary area(which was changed when we created a new item), then we save the context to commit unsaved changes to the persistentStore
+            try context.save()
         } catch {
-            print("Error encoding item array \(error)")
+            print("Error saving contex \(error)")
         }
         
         //refresh the tableView
         self.tableView.reloadData()
     }
-    //method which decodes the items in the Item.plist to display them back on the VC
-    func loadItems() {
-        //tap into our data by grabbing the property list
-        if let data = try? Data(contentsOf: dataFilePath!) {
-            //create the decoder
-            let decoder = PropertyListDecoder()
-            do {
-                //decode the data from the dataFilePath, the data-type is of type Item
-                itemArray = try decoder.decode([Item].self, from: data)
-            } catch {
-                print("Error deconding item array \(error)")
-            }
+    //method which pulls out every Item inside the persistentContainer
+    //external/internal parameter/also include a default value
+    func loadItems(with request : NSFetchRequest<Item> = Item.fetchRequest()) {
+        //let request : NSFetchRequest<Item> = Item.fetchRequest()
+        do {
+            //try to fetch all of the data and set the itemArray equal to the request
+            itemArray = try context.fetch(request)//output for this method is an array of items that is stored in persistentData
+        } catch {
+            print("Error fetching data from context \(error)")
         }
+        tableView.reloadData()
     }
     
+    
+    
+    
+}
+//MARK: - Search bar methods
+
+//Split up functionality of viewController
+extension ToDoListViewController : UISearchBarDelegate {
+    
+    //query the database and get the result the user is sending
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        
+        //This fetches all Item results, we later set limitations to it
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        //tag on a query, specifies what we want to get back from database
+        //When we hit search bar, whatever text placed into the searchBar into the %@. Then the query looks for all the items in the item array and look for the ones where the titles contain that text(%@)
+        //NSPredicate is a foundation class that specifies how data should be fetched or sorted
+        //[cd] makes the list case-insensitive
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        
+        //Sort the title data in alphabetal order
+        //add the sortDescriptor to the fetchRequest and it expects an array
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        //pass the request into the loadItems method, then we perform it
+        //Attempt to fetch the data, and if successful, make it equal to the itemArray
+        loadItems(with: request)
+        
+        
+        tableView.reloadData()
+    }
+    //Function gets called everytime a letter is typed in or the (x) is pressed (text is changed)
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        //looks at number of characters in the searchBar
+        if searchBar.text?.count == 0 {
+            //Fetch all the items, uses the default value as we give no parameter
+            loadItems()
+            
+            //manager that assigns projects to different threads, ask it to grab the main thread
+            //get the main Queue then resignFirstResponder
+            DispatchQueue.main.async {
+                //dismiss the keyboard by have the keyboard go away because we are no longing editing it, go back to the state it was before it was active
+                searchBar.resignFirstResponder()
+            }
+            
+        }
+    }
     
 }
 
