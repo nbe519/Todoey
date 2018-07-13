@@ -10,8 +10,19 @@ import UIKit
 import CoreData
 
 class ToDoListViewController: UITableViewController {
-    //following lines: converts arrayOfItems into a plist file we can save and retrive from
+
+    
     var itemArray = [Item]()
+    
+    //nil until set using the prepareForSegue
+    //Load up all the items that is relevant to the Category
+    var selectedCategory : Category? {
+        //what should happen as soon as selectedCategory gets set with a value
+        didSet{
+            loadItems()
+        }
+    }
+    
     
     //(C.R.U.D)
     //tapping into the UIapplicationClass, we are getting the shared singleton element(this corresponds to the current app as an object) tapping into its delegate with the data-type of an optional UIApplicationDelegate, casting it to our class Appdelegate. Now have access to appDelegate as an object.
@@ -27,11 +38,14 @@ class ToDoListViewController: UITableViewController {
         
         print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         
-        //load up the data
-        loadItems()
     }
 
     //MARK: - Tableview Datasource Methods
+    
+    
+    
+    
+    
     
     //Make the number of rows in the table equal to that which are in the item array
     override func tableView(_ tableView : UITableView,  numberOfRowsInSection section: Int) -> Int {
@@ -57,6 +71,7 @@ class ToDoListViewController: UITableViewController {
         
         //have the cell have the text of the item at a certain location and provide the cell text
         //indexPath holds location of the cell
+        //Set the text to whatever the title is at the specific indexPath for the itemArray
         cell.textLabel?.text = item.title
          
         //Ternary operator
@@ -70,7 +85,7 @@ class ToDoListViewController: UITableViewController {
     //MARK: TableView Delegate Methods
     
     //This is triggered when the tableView is clicked
-    //disSelectRowAt detects which row was selected. In  the method, we use that information to change the accessory
+    //disSelectRowAt detects which row was selected. In the method, we use that information to change the accessory
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
         //sets the done property to the opposite of what it currently is
@@ -107,15 +122,16 @@ class ToDoListViewController: UITableViewController {
         let action = UIAlertAction(title: "Add Button", style: .default) { (action) in
             
             
-            //When we add a new item to our tableview, we create a new object of type Item(automatically generated when we create a new entity), class already has access to all the properties. Type NSManagedObject, the rows that are inside the table, every row is its own NSManagedObject. Then we fill each of its fields then save it.
-            //not only initializes new item but also inserts it to the context
+            //When we add a new item to our tableview, we create a new object of type Item(automatically generated when we create a new entity), class already has access to all the properties.
+            //not only initializes new item but also inserts it to the Item context(the temporary area before it commited)
             let newItem = Item(context: self.context)
             newItem.title = textField.text!
             //declare all new items with the done equal to false, no checkmark
             newItem.done = false
             
+            newItem.parentCategory = self.selectedCategory
+            
             //what will happen once the user clicks the Add Item button on our UIAlert
-            //force unwrap because the textField can never be nil
             self.itemArray.append(newItem)
             
             //save the items whenever a newItem is appended to the itemArray
@@ -149,8 +165,21 @@ class ToDoListViewController: UITableViewController {
     }
     //method which pulls out every Item inside the persistentContainer
     //external/internal parameter/also include a default value
-    func loadItems(with request : NSFetchRequest<Item> = Item.fetchRequest()) {
-        //let request : NSFetchRequest<Item> = Item.fetchRequest()
+    func loadItems(with request : NSFetchRequest<Item> = Item.fetchRequest(), predicate : NSPredicate? = nil) {
+        
+        //parentCategory of all the items must have its name property matching the current selectedCatergory.name
+        let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
+        
+        if let additionalPredicate = predicate {
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate, additionalPredicate])
+        }else {
+            request.predicate = categoryPredicate
+        }
+        //array that contains cateforyPredicate and the predicate
+//        let compoundPrecicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate, predicate])
+//
+//        request.predicate = compoundPrecicate
+        
         do {
             //try to fetch all of the data and set the itemArray equal to the request
             itemArray = try context.fetch(request)//output for this method is an array of items that is stored in persistentData
@@ -178,7 +207,7 @@ extension ToDoListViewController : UISearchBarDelegate {
         //When we hit search bar, whatever text placed into the searchBar into the %@. Then the query looks for all the items in the item array and look for the ones where the titles contain that text(%@)
         //NSPredicate is a foundation class that specifies how data should be fetched or sorted
         //[cd] makes the list case-insensitive
-        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
         
         //Sort the title data in alphabetal order
         //add the sortDescriptor to the fetchRequest and it expects an array
@@ -186,7 +215,7 @@ extension ToDoListViewController : UISearchBarDelegate {
         
         //pass the request into the loadItems method, then we perform it
         //Attempt to fetch the data, and if successful, make it equal to the itemArray
-        loadItems(with: request)
+        loadItems(with: request, predicate: predicate)
         
         
         tableView.reloadData()
