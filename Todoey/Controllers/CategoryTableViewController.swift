@@ -7,21 +7,25 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class CategoryTableViewController: UITableViewController {
 
-    var categoryArray = [Category]()
+
+    let realm = try! Realm()
     
-    //temporary area where data is held before being commited
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    //automatically updates so there is no need to append anything to the array, for example, when a new item is created it is saved into the Category class, since categoryArray auto-updates, it saw the changes and updates the view controller
+    //changed from array of category items to a collection of results that are category objects
+    //is of type results from the category class
+    var categoryArray : Results<Category>?
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         
-        loadItems()
+        loadCategories()
 
     }
 
@@ -39,17 +43,15 @@ class CategoryTableViewController: UITableViewController {
         //the action keyword in the closure is the action that will be completed when the user taps the button
         let action = UIAlertAction(title: "Add Button", style: .default) { (action) in
             
-            
-            //When we add a new item to our tableview, we create a new object of type Category(automatically generated when we create a new entity), class already has access to all the properties.
-            //not only initializes new item but also inserts it to the Category context(the temporary zone)
-            let newCategory = Category(context: self.context)
+            //When the add button is pressed, we create a new category that is a new Category() object
+            //we give it a name based off the text in the text field
+            let newCategory = Category()
             newCategory.name = textField.text!
             
-            //what will happen once the user clicks the Add Item button on our UIAlert
-            self.categoryArray.append(newCategory)
             
-            //save the items whenever a newItem is appended to the itemArray
-            self.saveItems()
+            //Save the newCategory to realm
+            //When this happens, newCategory is appended to categoryArray as it auto-updates any results that are inputed
+            self.save(category: newCategory)
             
         }
         //the parameter, alertTextField, further configures the textField
@@ -70,7 +72,9 @@ class CategoryTableViewController: UITableViewController {
     
     override func tableView(_ tableView : UITableView,  numberOfRowsInSection section: Int) -> Int {
         //creates cells based on the number of categories in the categoryArray
-        return categoryArray.count
+        //Nil coalescing operator
+        //if categoryArray is nil, return a single cell
+        return categoryArray?.count ?? 1
     }
     
     //Gets called everytime we want a new cell to appear
@@ -84,12 +88,10 @@ class CategoryTableViewController: UITableViewController {
         //Go and find the prototype cell, CategoryCell, generate a bunch that can be reused. Once the item is no longer visible, it will reused by going to bottom of table.
         let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
         
-        //indexPath.row is going to hold the value of the row the resuableCell is at. If the Cell is at indexPath 1, then the itemArray is going to hold the 1-element inside
-        let category = categoryArray[indexPath.row]
-        
         //have the cell have the text of the item at a certain location and provide the cell text
         //indexPath holds location of the cell
-        cell.textLabel?.text = category.name
+        //if array is nil, append "No categories added yet" to the categoryArray
+        cell.textLabel?.text = categoryArray?[indexPath.row].name ?? "No categories added yet"
         
         return cell
     }
@@ -114,8 +116,8 @@ class CategoryTableViewController: UITableViewController {
         //identifies the current row that is selected, optional because there is a possiblility there is no row
         //indexPathForSelectedRow identifies the current row that is selected
         if let indexPath = tableView.indexPathForSelectedRow {
-            //set the selectedCategory method to the categoryArray's row
-            destinationVC.selectedCategory = categoryArray[indexPath.row]
+            //set the destination selectedCategory to the category at the indexpath.row that was selected
+            destinationVC.selectedCategory = categoryArray?[indexPath.row]
         }
     }
     
@@ -127,12 +129,14 @@ class CategoryTableViewController: UITableViewController {
     
     //transfer what is in the staging area to our permament data-source
     //This will not interfere with the itemArray because they are being saved into different tables
-    func saveItems() {
+    //expects it to be of type Category
+    func save(category : Category) {
         do {
-            //try to save the data
-            //looks at context, temporary area(which was changed when we created a new item), then we save the context to commit unsaved changes to the persistentStore
-            //Save anything in the temporary zone
-            try context.save()
+            //Save data to Realm
+            //commit changes to realm, we want to add our new category
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
             print("Error saving contex \(error)")
         }
@@ -142,14 +146,13 @@ class CategoryTableViewController: UITableViewController {
     }
     //method which pulls out the Categories inside the persistentContainer
     //external/internal parameter/also include a default value
-    func loadItems(with request : NSFetchRequest<Category> = Category.fetchRequest()) {
-        //let request : NSFetchRequest<Item> = Item.fetchRequest()
-        do {
-            //try to fetch all of the data and set the itemArray equal to whatever it retrives
-            categoryArray = try context.fetch(request)//output for this method is an array of items that is stored in persistentData
-        } catch {
-            print("Error fetching data from context \(error)")
-        }
+    func loadCategories() {
+        
+        //fetch all the objects from the Category class
+        //categoryArray expects a Result<Category> so the objects are returned as a Result
+         categoryArray = realm.objects(Category.self)
+        
         tableView.reloadData()
     }
 }
+
